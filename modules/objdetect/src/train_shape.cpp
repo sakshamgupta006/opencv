@@ -49,11 +49,17 @@
 #include <iostream>
 #include <opencv2/core.hpp>
 #include <string>
+#include <bits/stdc++.h>
 
 using namespace std;
 using namespace cv;
 
-string cascadename;
+string cascadeName;
+static void help()
+{
+    cout << "To be written near code completion"<<endl;
+}
+
 
 //to read the xml file of the annotation files
 static bool readStringList( const string& filename, vector<string>& l, string annotation_path_prefix )
@@ -75,21 +81,18 @@ static bool readStringList( const string& filename, vector<string>& l, string an
 }
 
 //read txt files iteratively opening image and its annotations
-static bool readtxt(vector<string> filepath, vector<Point2f>& landmarks, string path_prefix)
+static bool readtxt(vector<string> filepath, std::map<string, vector<Point2f>>& landmarks, string path_prefix)
 {
     //txt file read initiated
-    vector<string>::iterator it2 = filepath.begin();
-    for (; it2 != filepath.end() ; it2++)
+    vector<string>::iterator fileiterator = filepath.begin();
+    for (; fileiterator != filepath.end() ; fileiterator++)
     {
         ifstream file;
-        file.open((string)*it2);
-        string imgpath,line;
-        getline(file,imgpath);
-        imgpath.erase(imgpath.length()-1);
-        imgpath = path_prefix + imgpath + ".jpg";
-        Mat image = imread(imgpath);
-        imshow("res",image);
-        waitKey(0);
+        file.open((string)*fileiterator);
+        string key,line;
+        getline(file,key);
+        key.erase(key.length()-1);
+        vector<Point2f> landmarks_temp;
         while(getline(file,line))
         {
             int increment_x=0,increment_y=0;
@@ -110,21 +113,103 @@ static bool readtxt(vector<string> filepath, vector<Point2f>& landmarks, string 
             Point2f new_point;
             new_point.x=std::stof(x_coord);
             new_point.y=std::stof(y_cooord);
-            landmarks.push_back(new_point);
+            landmarks_temp.push_back(new_point);
+
         }
         file.close();
+        landmarks[key] = landmarks_temp;
         //file reading completed
     }
     return true;
 }
 
-int main()
+static bool extract_mean_shape(std::map<string, vector<Point2f>>& landmarks, string path_prefix,CascadeClassifier& cascade)
 {
-        string filename = "list.xml";       // need to be passed as arguments
+    std::map<string, vector<Point2f>>::iterator db_iterator = landmarks.begin(); // random inititalization as
+    db_iterator++;
+    string random_initial_image = db_iterator->first;                            //any face file can be taken by imagelist creator
+    //find the face size dimmensions which will be used to center and scale each database image
+    string imgpath;
+    imgpath = path_prefix + random_initial_image + ".jpg";
+    cout<<imgpath<<endl;
+    Mat image = imread(imgpath);
+    imshow("rr",image);
+    waitKey(0);
+    //apply face detector on the image
+    const static Scalar colors[] =
+    {
+        Scalar(255,0,0),
+        Scalar(255,128,0),
+        Scalar(255,255,0),
+        Scalar(0,255,0),
+        Scalar(0,128,255),
+        Scalar(0,255,255),
+        Scalar(0,0,255),
+        Scalar(255,0,255)
+    };
+    int scale = 1;
+    //remove once testing is complete
+    vector<Rect> faces;
+    Mat gray, smallImg;
+    cvtColor( image, gray, COLOR_BGR2GRAY);
+    equalizeHist(gray,gray);
+    cascade.detectMultiScale( gray, faces,
+        1.1, 4, 0
+        //|CASCADE_FIND_BIGGEST_OBJECT,
+        //|CASCADE_DO_ROUGH_SEARCH
+        |CASCADE_SCALE_IMAGE,
+        Size(30, 30) );
+    cout<<"here"<<endl;
+    for ( size_t i = 0; i < faces.size(); i++ )
+    {
+        Rect r = faces[i];
+        Scalar color = colors[i%8];
+        double aspect_ratio = (double)r.width/r.height;
+        rectangle( image, cvPoint(cvRound(r.x*scale), cvRound(r.y*scale)),
+                       cvPoint(cvRound((r.x + r.width-1)*scale), cvRound((r.y + r.height-1)*scale)),
+                       color, 3, 8, 0);
+
+    }
+    imshow("result",image);
+    waitKey(0);
+
+
+    return true;
+}
+
+
+
+
+int main(int argc, const char** argv )
+{
+        CascadeClassifier cascade;
+        string filename,path_prefix;
+        cv::CommandLineParser parser(argc ,argv,
+            "{help h||}"
+            "{cascade|/home/cooper/gsoc/opencv/data/haarcascades/haarcascade_frontalface_alt.xml|}"
+        );
+        cascadeName= parser.get<string>("cascade");
+        if( !cascade.load( cascadeName ) )
+        {
+            cerr << "ERROR: Could not load classifier cascade" << endl;
+            //help();
+            return -1;
+        }
+        filename = "list.xml";       // need to be passed as arguments
         vector<string> names;
-        vector<Point2f> landmarks;
-        string path_prefix = "annotation/";    // need to be passed as arguments
+        std::map<string, vector<Point2f>> landmarks;
+        path_prefix = "/home/cooper/Documents/gsocextra/annotation/";    // need to be passed as arguments
         readStringList(filename, names, path_prefix);
         readtxt(names, landmarks,path_prefix);
+        vector<Point2f>::iterator it;
+        vector<Point2f> temp = landmarks["100032540_1"];
+        it = temp.begin();
+        for (; it < temp.end(); it++)
+        {
+            cout<<*it<<endl;
+        }
+        extract_mean_shape(landmarks, path_prefix,cascade);
+
+
 return 0;
 }
