@@ -50,19 +50,32 @@
 #include <opencv2/core.hpp>
 #include <string>
 #include <bits/stdc++.h>
+#include "/home/cooper/gsoc/opencv/modules/objdetect/src/train_shape.hpp"
 
-using namespace std;
-using namespace cv;
 
-string cascadeName;
-static void help()
-{
-    cout << "To be written near code completion"<<endl;
-}
+
+namespace cv{
+
+
+class KazemiFaceAlign{
+
+public:
+    static bool readStringList( const string& filename, vector<string>& l, string annotation_path_prefix );
+    static bool getDataFromTxt(vector<string> filepath, std::map<string, vector<Point2f>>& landmarks, string path_prefix);
+    static bool extractMeanShape()std::map<string, vector<Point2f>>& landmarks, string path_prefix,CascadeClassifier& cascade;
+    static bool faceDetector();
+
+private:
+    int numFaces;
+    int numLandmarks;
+    vector<Point3f> meanShape;
+
+};
+
 
 
 //to read the xml file of the annotation files
-static bool readStringList( const string& filename, vector<string>& l, string annotation_path_prefix )
+static bool KazemiFaceAlign::readStringList( const string& filename, vector<string>& l, string annotation_path_prefix )
 {
     l.resize(0);
     FileStorage fs(filename, FileStorage::READ);
@@ -81,7 +94,7 @@ static bool readStringList( const string& filename, vector<string>& l, string an
 }
 
 //read txt files iteratively opening image and its annotations
-static bool readtxt(vector<string> filepath, std::map<string, vector<Point2f>>& landmarks, string path_prefix)
+static bool KazemiFaceAlign::readtxt(vector<string> filepath, std::map<string, vector<Point2f>>& landmarks, string path_prefix)
 {
     //txt file read initiated
     vector<string>::iterator fileiterator = filepath.begin();
@@ -123,7 +136,13 @@ static bool readtxt(vector<string> filepath, std::map<string, vector<Point2f>>& 
     return true;
 }
 
-static bool extract_mean_shape(std::map<string, vector<Point2f>>& landmarks, string path_prefix,CascadeClassifier& cascade)
+
+static bool KazemiFaceAlign::faceDetector()
+{
+
+}
+
+static bool KazemiFaceAlign::extractMeanShape(std::map<string, vector<Point2f>>& landmarks, string path_prefix,CascadeClassifier& cascade)
 {
     std::map<string, vector<Point2f>>::iterator db_iterator = landmarks.begin(); // random inititalization as
     db_iterator++;
@@ -131,10 +150,7 @@ static bool extract_mean_shape(std::map<string, vector<Point2f>>& landmarks, str
     //find the face size dimmensions which will be used to center and scale each database image
     string imgpath;
     imgpath = path_prefix + random_initial_image + ".jpg";
-    cout<<imgpath<<endl;
     Mat image = imread(imgpath);
-    imshow("rr",image);
-    waitKey(0);
     //apply face detector on the image
     const static Scalar colors[] =
     {
@@ -172,44 +188,6 @@ static bool extract_mean_shape(std::map<string, vector<Point2f>>& landmarks, str
     }
     imshow("result",image);
     waitKey(0);
-
-
     return true;
 }
-
-
-
-
-int main(int argc, const char** argv )
-{
-        CascadeClassifier cascade;
-        string filename,path_prefix;
-        cv::CommandLineParser parser(argc ,argv,
-            "{help h||}"
-            "{cascade|/home/cooper/gsoc/opencv/data/haarcascades/haarcascade_frontalface_alt.xml|}"
-        );
-        cascadeName= parser.get<string>("cascade");
-        if( !cascade.load( cascadeName ) )
-        {
-            cerr << "ERROR: Could not load classifier cascade" << endl;
-            //help();
-            return -1;
-        }
-        filename = "list.xml";       // need to be passed as arguments
-        vector<string> names;
-        std::map<string, vector<Point2f>> landmarks;
-        path_prefix = "/home/cooper/Documents/gsocextra/annotation/";    // need to be passed as arguments
-        readStringList(filename, names, path_prefix);
-        readtxt(names, landmarks,path_prefix);
-        vector<Point2f>::iterator it;
-        vector<Point2f> temp = landmarks["100032540_1"];
-        it = temp.begin();
-        for (; it < temp.end(); it++)
-        {
-            cout<<*it<<endl;
-        }
-        extract_mean_shape(landmarks, path_prefix,cascade);
-
-
-return 0;
 }
