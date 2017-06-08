@@ -38,9 +38,6 @@
 // the use of this software, even if advised of the possibility of such damage.
 //
 //M*/
-
-
-
 #include "opencv2/objdetect.hpp"
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgproc.hpp"
@@ -52,30 +49,10 @@
 #include <bits/stdc++.h>
 #include "/home/cooper/gsoc/opencv/modules/objdetect/src/train_shape.hpp"
 
-
-
 namespace cv{
 
-
-class KazemiFaceAlign{
-
-public:
-    static bool readStringList( const string& filename, vector<string>& l, string annotation_path_prefix );
-    static bool getDataFromTxt(vector<string> filepath, std::map<string, vector<Point2f>>& landmarks, string path_prefix);
-    static bool extractMeanShape()std::map<string, vector<Point2f>>& landmarks, string path_prefix,CascadeClassifier& cascade;
-    static bool faceDetector();
-
-private:
-    int numFaces;
-    int numLandmarks;
-    vector<Point3f> meanShape;
-
-};
-
-
-
 //to read the xml file of the annotation files
-static bool KazemiFaceAlign::readStringList( const string& filename, vector<string>& l, string annotation_path_prefix )
+bool KazemiFaceAlign::readStringList( const string& filename, vector<string>& l, string annotation_path_prefix )
 {
     l.resize(0);
     FileStorage fs(filename, FileStorage::READ);
@@ -94,7 +71,7 @@ static bool KazemiFaceAlign::readStringList( const string& filename, vector<stri
 }
 
 //read txt files iteratively opening image and its annotations
-static bool KazemiFaceAlign::readtxt(vector<string> filepath, std::map<string, vector<Point2f>>& landmarks, string path_prefix)
+bool KazemiFaceAlign::readtxt(vector<string> filepath, std::map<string, vector<Point2f>>& landmarks, string path_prefix)
 {
     //txt file read initiated
     vector<string>::iterator fileiterator = filepath.begin();
@@ -127,7 +104,6 @@ static bool KazemiFaceAlign::readtxt(vector<string> filepath, std::map<string, v
             new_point.x=std::stof(x_coord);
             new_point.y=std::stof(y_cooord);
             landmarks_temp.push_back(new_point);
-
         }
         file.close();
         landmarks[key] = landmarks_temp;
@@ -136,13 +112,11 @@ static bool KazemiFaceAlign::readtxt(vector<string> filepath, std::map<string, v
     return true;
 }
 
-
-static bool KazemiFaceAlign::faceDetector()
+bool KazemiFaceAlign::faceDetector()
 {
-
 }
 
-static bool KazemiFaceAlign::extractMeanShape(std::map<string, vector<Point2f>>& landmarks, string path_prefix,CascadeClassifier& cascade)
+bool KazemiFaceAlign::extractMeanShape(std::map<string, vector<Point2f>>& landmarks, string path_prefix,CascadeClassifier& cascade)
 {
     std::map<string, vector<Point2f>>::iterator db_iterator = landmarks.begin(); // random inititalization as
     db_iterator++;
@@ -150,7 +124,13 @@ static bool KazemiFaceAlign::extractMeanShape(std::map<string, vector<Point2f>>&
     //find the face size dimmensions which will be used to center and scale each database image
     string imgpath;
     imgpath = path_prefix + random_initial_image + ".jpg";
+    cout<<imgpath<<endl;
     Mat image = imread(imgpath);
+    if(image.empty())
+    {
+        cout<<"Image not loaded"<<endl;
+        return 0;
+    }
     //apply face detector on the image
     const static Scalar colors[] =
     {
@@ -167,7 +147,9 @@ static bool KazemiFaceAlign::extractMeanShape(std::map<string, vector<Point2f>>&
     //remove once testing is complete
     vector<Rect> faces;
     Mat gray, smallImg;
+    cout<<"color change started"<<endl;
     cvtColor( image, gray, COLOR_BGR2GRAY);
+    cout<<"color change finished"<<endl;
     equalizeHist(gray,gray);
     cascade.detectMultiScale( gray, faces,
         1.1, 4, 0
@@ -184,7 +166,6 @@ static bool KazemiFaceAlign::extractMeanShape(std::map<string, vector<Point2f>>&
         rectangle( image, cvPoint(cvRound(r.x*scale), cvRound(r.y*scale)),
                        cvPoint(cvRound((r.x + r.width-1)*scale), cvRound((r.y + r.height-1)*scale)),
                        color, 3, 8, 0);
-
     }
     imshow("result",image);
     waitKey(0);

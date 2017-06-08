@@ -23,3 +23,5 @@ CMakeCache.txt
 *.log
 *.tlog
 build
+modules/objdetect/src/build_test/
+modules/objdetect/src/data/

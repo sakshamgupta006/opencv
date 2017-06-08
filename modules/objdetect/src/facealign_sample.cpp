@@ -8,6 +8,7 @@
 #include <string>
 #include <bits/stdc++.h>
 #include "/home/cooper/gsoc/opencv/modules/objdetect/src/train_shape.hpp"
+
 using namespace std;
 using namespace cv;
 
@@ -35,19 +36,13 @@ int main(int argc, const char** argv )
         filename = "list.xml";       // need to be passed as arguments
         vector<string> names;
         std::map<string, vector<Point2f>> landmarks;
-        path_prefix = "/home/cooper/Documents/gsocextra/annotation/";    // need to be passed as arguments
+        path_prefix = "/home/cooper/gsoc/opencv/modules/objdetect/src/data/train/";    // need to be passed as arguments
         KazemiFaceAlign train;
         train.readStringList(filename, names, path_prefix);
         train.readtxt(names, landmarks,path_prefix);
         vector<Point2f>::iterator it;
         vector<Point2f> temp = landmarks["100032540_1"];
         it = temp.begin();
-        for (; it < temp.end(); it++)
-        {
-            cout<<*it<<endl;
-        }
         train.extractMeanShape(landmarks, path_prefix,cascade);
-
-
 return 0;
 }
