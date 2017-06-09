@@ -50,17 +50,16 @@ class CV_EXPORTS KazemiFaceAlign
 {
 public:
     /*@reads the file list(xml) created by imagelist_creator.cpp */
-    virtual bool readStringList(const string& filename, vector<string>& l, string annotation_path_prefix);
+    virtual bool readAnnotationList(vector<cv::String>& l, string annotation_path_prefix);
     /*@Parse the txt file to extract image and its annotations*/
-    virtual bool readtxt(vector<string> filepath, std::map<string, vector<Point2f>>& landmarks, string path_prefix);
+    virtual bool readtxt(vector<cv::String>& filepath, std::map<string, vector<Point2f>>& landmarks, string path_prefix);
     // /*@Returns number of faces detected in the image */
-    // virtual int getFacesNum() const =0;
-    // /*@Returns number of landmarks to be considered */
-    // virtual int getLandmarksNum() const=0;
-    virtual int getLandmarksNum() const {return numLandmarks;}
     virtual int getFacesNum() const {return numFaces;}
+    // /*@Returns number of landmarks to be considered */
+    virtual int getLandmarksNum() const {return numLandmarks;}
     virtual bool extractMeanShape(std::map<string, vector<Point2f>>& landmarks, string path_prefix,CascadeClassifier& cascade);
-    virtual bool faceDetector();
+    virtual vector<Rect> faceDetector(Mat image,CascadeClassifier& cascade);
+    virtual Mat getimage(string imgpath);
 private:
     int numFaces;
     int numLandmarks;

@@ -21,7 +21,7 @@ static void help()
 int main(int argc, const char** argv )
 {
         CascadeClassifier cascade;
-        string filename,path_prefix;
+        string path_prefix;
         cv::CommandLineParser parser(argc ,argv,
             "{help h||}"
             "{cascade|/home/cooper/gsoc/opencv/data/haarcascades/haarcascade_frontalface_alt.xml|}"
@@ -33,12 +33,11 @@ int main(int argc, const char** argv )
             //help();
             return -1;
         }
-        filename = "list.xml";       // need to be passed as arguments
-        vector<string> names;
+        vector<cv::String> names;
         std::map<string, vector<Point2f>> landmarks;
         path_prefix = "/home/cooper/gsoc/opencv/modules/objdetect/src/data/train/";    // need to be passed as arguments
         KazemiFaceAlign train;
-        train.readStringList(filename, names, path_prefix);
+        train.readAnnotationList(names, path_prefix);
         train.readtxt(names, landmarks,path_prefix);
         vector<Point2f>::iterator it;
         vector<Point2f> temp = landmarks["100032540_1"];

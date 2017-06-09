@@ -51,30 +51,19 @@
 
 namespace cv{
 
-//to read the xml file of the annotation files
-bool KazemiFaceAlign::readStringList( const string& filename, vector<string>& l, string annotation_path_prefix )
+//to read the annotation files file of the annotation files
+bool KazemiFaceAlign::readAnnotationList(vector<cv::String>& l, string annotation_path_prefix )
 {
-    l.resize(0);
-    FileStorage fs(filename, FileStorage::READ);
-    if( !fs.isOpened() )
-        return false;
-    FileNode n = fs.getFirstTopLevelNode();
-    if( n.type() != FileNode::SEQ )
-        return false;
-    FileNodeIterator it = n.begin(), it_end = n.end();
-    for( ; it != it_end; ++it )
-        {
-            string full_path = annotation_path_prefix + (string)*it;
-            l.push_back(full_path);
-        }
+    string annotationPath = annotation_path_prefix + "*.txt";
+    glob(annotationPath,l,false);
     return true;
 }
 
 //read txt files iteratively opening image and its annotations
-bool KazemiFaceAlign::readtxt(vector<string> filepath, std::map<string, vector<Point2f>>& landmarks, string path_prefix)
+bool KazemiFaceAlign::readtxt(vector<cv::String>& filepath, std::map<string, vector<Point2f>>& landmarks, string path_prefix)
 {
     //txt file read initiated
-    vector<string>::iterator fileiterator = filepath.begin();
+    vector<cv::String>::iterator fileiterator = filepath.begin();
     for (; fileiterator != filepath.end() ; fileiterator++)
     {
         ifstream file;
@@ -112,44 +101,13 @@ bool KazemiFaceAlign::readtxt(vector<string> filepath, std::map<string, vector<P
     return true;
 }
 
-bool KazemiFaceAlign::faceDetector()
+vector<Rect> KazemiFaceAlign::faceDetector(Mat image,CascadeClassifier& cascade)
 {
-}
-
-bool KazemiFaceAlign::extractMeanShape(std::map<string, vector<Point2f>>& landmarks, string path_prefix,CascadeClassifier& cascade)
-{
-    std::map<string, vector<Point2f>>::iterator db_iterator = landmarks.begin(); // random inititalization as
-    db_iterator++;
-    string random_initial_image = db_iterator->first;                            //any face file can be taken by imagelist creator
-    //find the face size dimmensions which will be used to center and scale each database image
-    string imgpath;
-    imgpath = path_prefix + random_initial_image + ".jpg";
-    cout<<imgpath<<endl;
-    Mat image = imread(imgpath);
-    if(image.empty())
-    {
-        cout<<"Image not loaded"<<endl;
-        return 0;
-    }
-    //apply face detector on the image
-    const static Scalar colors[] =
-    {
-        Scalar(255,0,0),
-        Scalar(255,128,0),
-        Scalar(255,255,0),
-        Scalar(0,255,0),
-        Scalar(0,128,255),
-        Scalar(0,255,255),
-        Scalar(0,0,255),
-        Scalar(255,0,255)
-    };
+    vector<Rect> faces;
     int scale = 1;
     //remove once testing is complete
-    vector<Rect> faces;
     Mat gray, smallImg;
-    cout<<"color change started"<<endl;
     cvtColor( image, gray, COLOR_BGR2GRAY);
-    cout<<"color change finished"<<endl;
     equalizeHist(gray,gray);
     cascade.detectMultiScale( gray, faces,
         1.1, 4, 0
@@ -157,18 +115,40 @@ bool KazemiFaceAlign::extractMeanShape(std::map<string, vector<Point2f>>& landma
         //|CASCADE_DO_ROUGH_SEARCH
         |CASCADE_SCALE_IMAGE,
         Size(30, 30) );
-    cout<<"here"<<endl;
+    numFaces = faces.size();
     for ( size_t i = 0; i < faces.size(); i++ )
     {
         Rect r = faces[i];
-        Scalar color = colors[i%8];
+        Scalar color = Scalar(255,0,0);
         double aspect_ratio = (double)r.width/r.height;
         rectangle( image, cvPoint(cvRound(r.x*scale), cvRound(r.y*scale)),
                        cvPoint(cvRound((r.x + r.width-1)*scale), cvRound((r.y + r.height-1)*scale)),
                        color, 3, 8, 0);
     }
-    imshow("result",image);
-    waitKey(0);
+    return faces;
+}
+
+Mat KazemiFaceAlign::getimage(string imgpath)
+{
+    return imread(imgpath);
+}
+
+bool KazemiFaceAlign::extractMeanShape(std::map<string, vector<Point2f>>& landmarks, string path_prefix,CascadeClassifier& cascade)
+{
+    std::map<string, vector<Point2f>>::iterator db_iterator = landmarks.begin(); // random inititalization as
+    string random_initial_image = db_iterator->first;                            //any face file can be taken by imagelist creator
+    //find the face size dimmensions which will be used to center and scale each database image
+    string imgpath;
+    imgpath = path_prefix + random_initial_image + ".jpg";
+    Mat image = getimage(imgpath);
+    if(image.empty())
+    {
+        cerr<<"ERROR: Image not loaded...Directory not found!!"<<endl;
+        return 0;
+    }
+    //apply face detector on the image
+    //assuming that the intitial shape contains only a single face for now
+    vector<Rect> initial = faceDetector(image,cascade);
     return true;
 }
 }

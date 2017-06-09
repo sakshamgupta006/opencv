@@ -25,4 +25,3 @@ CMakeCache.txt
 build
 modules/objdetect/src/build_test/
 modules/objdetect/src/data/
-modules/objdetect/src/build_local/
