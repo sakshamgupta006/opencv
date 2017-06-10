@@ -128,27 +128,86 @@ vector<Rect> KazemiFaceAlign::faceDetector(Mat image,CascadeClassifier& cascade)
     return faces;
 }
 
-Mat KazemiFaceAlign::getimage(string imgpath)
+Mat KazemiFaceAlign::getImage(string imgpath, string path_prefix)
 {
-    return imread(imgpath);
+    return imread(path_prefix + imgpath + ".jpg");
 }
 
 bool KazemiFaceAlign::extractMeanShape(std::map<string, vector<Point2f>>& landmarks, string path_prefix,CascadeClassifier& cascade)
 {
-    std::map<string, vector<Point2f>>::iterator db_iterator = landmarks.begin(); // random inititalization as
-    string random_initial_image = db_iterator->first;                            //any face file can be taken by imagelist creator
+    std::map<string, vector<Point2f>>::iterator dbIterator = landmarks.begin(); // random inititalization as
+    //any face file can be taken by imagelist creator
     //find the face size dimmensions which will be used to center and scale each database image
-    string imgpath;
-    imgpath = path_prefix + random_initial_image + ".jpg";
-    Mat image = getimage(imgpath);
-    if(image.empty())
+    Mat initialImage = getImage(dbIterator->first,path_prefix);
+    if(initialImage.empty())
     {
         cerr<<"ERROR: Image not loaded...Directory not found!!"<<endl;
         return 0;
     }
     //apply face detector on the image
     //assuming that the intitial shape contains only a single face for now
-    vector<Rect> initial = faceDetector(image,cascade);
+    vector<Rect> initial = faceDetector(initialImage,cascade);
+    //now we have the initial/source image
+    Point2f refrencePoints[3];
+    refrencePoints[0] = Point2f(initial[0].x,initial[0].y);
+    refrencePoints[1] = Point2f((initial[0].x + initial[0].width),initial[0].y);
+    refrencePoints[2] = Point2f(initial[0].x , (initial[0].y + initial[0].height));
+    //Calculate Face Rectangle and Affine Matrix for the whole dataset
+    meanShape.clear();
+    int count =0;
+    Point2f mean[numLandmarks];
+    //Enter the value of intital shape in mean shape
+    dbIterator++;
+    for (; dbIterator != landmarks.end() ; dbIterator++)
+    {
+        cout<<count++<<endl;
+        Mat currentImage = getImage(dbIterator->first,path_prefix);
+        if(currentImage.empty())
+        {
+            cerr<<"ERROR: Image not loaded...Directory not found!!"<<endl;
+            break;
+        }
+        vector<Rect> currentFaces = faceDetector(currentImage,cascade);
+        if(currentFaces.empty())
+        {
+            cerr<<"No faces found skipping the image"<<endl;
+            continue;
+        }
+        Point2f currentPoints[2];
+        currentPoints[0] = Point2f(currentFaces[0].x,currentFaces[0].y);
+        currentPoints[1] = Point2f((currentFaces[0].x + currentFaces[0].width),currentFaces[0].y);
+        currentPoints[2] = Point2f(currentFaces[0].x , (currentFaces[0].y + currentFaces[0].height));
+        Mat affineMatrix = getAffineTransform(currentPoints , refrencePoints);
+        int landmarkIterator = 0;
+        //Transform each fiducial Point to get it relative to the initital image
+        for (vector< Point2f >::iterator fiducialIt = dbIterator->second.begin() ; fiducialIt != dbIterator->second.end() ; fiducialIt++ )
+        {
+            Mat fiducialPointMatrix = (Mat_<double>(3,1) << (*fiducialIt).x, (*fiducialIt).y , 1);
+            Mat resultAffineMatrix = (Mat_<double>(3,1)<<0,0,1);
+            resultAffineMatrix = affineMatrix*fiducialPointMatrix;
+            //warpAffine(fiducialPointMatrix , resultAffineMatrix, affineMatrix, resultAffineMatrix.size()); // not working
+            mean[landmarkIterator].x += (double(resultAffineMatrix.at<double>(0,0)))/landmarks.size();
+            mean[landmarkIterator].y += (double(resultAffineMatrix.at<double>(1,0)))/landmarks.size();
+            landmarkIterator++;
+        }
+    }
+    //fill meanShape vector
+    ofstream meanShapefile;
+    meanShapefile.open("meanshape.txt");
+    meanShapefile << "%%MeanShape Landmark Locations\n" ;
+    for (int fillMeanShape = 0; fillMeanShape < numLandmarks; ++fillMeanShape)
+    {
+        meanShape.push_back(mean[fillMeanShape]);
+        meanShapefile << mean[fillMeanShape] << "\n";
+
+    }
     return true;
 }
+
+bool KazemiFaceAlign::getInitialShape(Mat& image, CascadeClassifier& cascade)
+{
+    vector<Rect> facesInImage = faceDetector(image , cascade);
+
+}
+
 }

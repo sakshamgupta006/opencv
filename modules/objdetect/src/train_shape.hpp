@@ -57,13 +57,18 @@ public:
     virtual int getFacesNum() const {return numFaces;}
     // /*@Returns number of landmarks to be considered */
     virtual int getLandmarksNum() const {return numLandmarks;}
+
     virtual bool extractMeanShape(std::map<string, vector<Point2f>>& landmarks, string path_prefix,CascadeClassifier& cascade);
+
     virtual vector<Rect> faceDetector(Mat image,CascadeClassifier& cascade);
-    virtual Mat getimage(string imgpath);
+
+    virtual Mat getImage(string imgpath,string path_prefix);
+
+    virtual bool getInitialShape(Mat& image, CascadeClassifier& cascade);
 private:
     int numFaces;
-    int numLandmarks;
-    vector<Point3f> meanShape;
+    int numLandmarks = 194;
+    vector<Point2f> meanShape;
 };
 CV_EXPORTS Ptr<KazemiFaceAlign> create();
 }
