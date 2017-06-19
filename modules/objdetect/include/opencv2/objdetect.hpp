@@ -214,6 +214,77 @@ public:
     virtual void setMaskGenerator(const Ptr<MaskGenerator>& maskGenerator) = 0;
     virtual Ptr<MaskGenerator> getMaskGenerator() = 0;
 };
+//! struct for creating a split Feature in the regression Tree
+struct splitFeature
+{
+    //! index which stores the left subtree value of the split for the regression tree
+    unsigned long idx1;
+    //! index which stores the right subtree value of the split for the regression tree
+    unsigned long idx2;
+    //! threshold which decides wheather the split is good or not
+    float thresh;
+};
+//! struct for holding a Regression Tree
+struct regressionTree
+{
+    //! vector that contains split features which forms the decision nodes of the tree
+    vector<splitFeature> split;
+    //! vector that contains the annotation values provided by the Regression Tree at the terminal nodes
+    vector< vector<Point2f> > leaves;
+};
+//! struct for holding the training samples attributes during training of Regression Tree's
+struct trainSample
+{
+    //! Mat object to store the image from the dataset
+    Mat img;
+    //! vector to store faces detected using any standard facial detector
+    vector<Rect> rect;
+    //! vector to store final annotations of the face
+    vector<Point2f> targetShape;
+    //! vector that will contain the current annotations when regression tree is being trained
+    vector<Point2f> currentShape;
+    //! vector that will contain the residual annotations that is obtained using current and target annotations
+    vector<Point2f> residualShape;
+    //! vector to store the pixel values at the desired annotations locations.
+    vector<double> pixelValues;
+};
+/** @brief Implementation of face alignnment based on Ensemble of Regression Trees
+ */
+class CV_EXPORTS KazemiFaceAlign
+{
+public:
+    KazemiFaceAlign();
+    /** @brief  Initiates Face alignment module
+
+    @param
+    */
+    virtual void trainKazemiFaceAlign()
+    /** @brief Initiates training of Face alignment module
+
+    @param
+    */
+    //@ Returns the left of child the Regression Tree
+    virtual unsigned long leftChild (unsigned long idx);
+    //@ Returns the right child of the Regression Tree
+    virtual unsigned long rightChild (unsigned long idx);
+    /*@reads the file list(xml) created by imagelist_creator.cpp */
+    virtual bool readAnnotationList(vector<cv::String>& l, string annotation_path_prefix);
+    /*@Parse the txt file to extract image and its annotations*/
+    virtual bool readtxt(vector<cv::String>& filepath, std::map<string, vector<Point2f>>& landmarks, string path_prefix);
+    //@ Extracts Mean Shape from the given dataset
+    virtual bool extractMeanShape(std::map<string, vector<Point2f>>& landmarks, string path_prefix,CascadeClassifier& cascade);
+    //@ Applies Haar based facedetectorl
+    virtual vector<Rect> faceDetector(Mat image,CascadeClassifier& cascade);
+    //@ return an image
+    virtual Mat getImage(string imgpath,string path_prefix);
+    //@ Gives initial fiducial Points respective to the mean shape
+    virtual bool getInitialShape(Mat& image, CascadeClassifier& cascade);
+    //@ Reads MeanShape into a vector
+    virtual bool readMeanShape();
+    //@ Calculate distance between given pixel co-ordinates
+    virtual double getDistance(Point2f first , Point2f second);
+};
+//CV_EXPORTS Ptr<KazemiFaceAlign> createKazemiFaceAlign(); /* To be added when porting for Python wrapping */
 
 /** @brief Cascade classifier class for object detection.
  */
