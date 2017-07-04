@@ -136,25 +136,26 @@ class KazemiFaceAlignImpl
             numLandmarks = 194;
             cascadeDepth = 10;
             treeDepth = 4;
-            numTreesperCascade = 500;
+            numTreesperCascade = 50;
             learningRate = 0.1;
-            oversamplingAmount = 20;
+            oversamplingAmount = 2;
             feature_pool_size = 400;
+            numTestCoordinates = 400;
             lambda = 0.1;
             numTestSplits = 20;
             numFeature = 400;
         }
-
-    protected:
         //@ Randomly Generates splits given a set of pixel co-ordinates
         splitFeature randomSplitFeatureGenerator(vector<Point2f>& pixelCoordinates);
         //@
         splitFeature splitGenerator(vector<trainSample>& samples, vector<Point2f> pixelCoordinates, unsigned long start ,
-                                    unsigned long end,const Point2f& sum, Point2f& leftSum, Point2f& rightSum);
+                                    unsigned long end, vector<Point2f>& sum, vector<Point2f>& leftSum, vector<Point2f>& rightSum);
         //@
         bool extractPixelValues(trainSample &sample ,vector<Point2f>& pixelCoordinates);
         //@
-        regressionTree buildRegressionTree(vector<trainSample>& samples, vector<Point2f> pixelCoordinates);
+        regressionTree buildRegressionTree(vector<trainSample>& samples, vector<Point2f>& pixelCoordinates);
+        //@
+        vector<regressionTree> gradientBoosting(vector<trainSample>& samples, vector<Point2f>& pixelCoordinates);
         //@
         unsigned long partitionSamples(splitFeature split, vector<trainSample>& samples,
                                         unsigned long start, unsigned long end);
@@ -165,6 +166,9 @@ class KazemiFaceAlignImpl
         //@
         bool fillData(vector<trainSample>& samples,std::map<string, vector<Point2f>>& landmarks,
                        string path_prefix, CascadeClassifier& cascade);
+        //@
+        unsigned int findNearestLandmark(Point2f& pixelValue);
+        bool calcRelativePixels(vector<Point2f>& sample,vector<Point2f>& pixel_coordinates);
         //@
         bool generateTestCoordinates(vector< vector<Point2f> >& pixelCoordinates);
     private:
@@ -182,6 +186,7 @@ class KazemiFaceAlignImpl
         unsigned int feature_pool_size;
         float lambda;
         unsigned int numTestSplits;
+        unsigned int numTestCoordinates;
         int numFeature;
 };
 }
