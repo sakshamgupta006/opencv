@@ -183,7 +183,11 @@ void detectAndDraw( Mat& img, CascadeClassifier& cascade,
         //|CASCADE_FIND_BIGGEST_OBJECT
         //|CASCADE_DO_ROUGH_SEARCH
         |CASCADE_SCALE_IMAGE,
-        Size(30, 30) );
+        Size(100, 100) );
+    cout<<faces[0]<<endl;
+    cout<<faces[1]<<endl;
+    cout<<faces[2]<<endl;
+    cout<<faces[3]<<endl;
     if( tryflip )
     {
         flip(smallImg, smallImg, 1);
