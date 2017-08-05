@@ -50,6 +50,89 @@ using namespace cv;
 
 namespace cv{
 
+//Parallelization Inducing Functions
+class calcSumSample : public ParallelLoopBody
+{
+public:
+    calcSumSample (vector<trainSample>& samples, vector<Point2f>& sumOutput)
+        : _samples(samples), _sumOutput(sumOutput)
+    {
+    }
+
+    virtual void operator ()(const Range& range) const
+    {
+        for (unsigned long r = range.start; r < range.end; r++)
+        {
+            for (unsigned long i = 0; i < _samples[r].currentShape.size(); ++i)
+            {
+                _samples[r].currentShape[i] = _samples[r].currentShape[i] + _sumOutput[i];
+            }
+        }
+    }
+
+private:
+    vector<trainSample>& _samples;
+    vector<Point2f>& _sumOutput;
+};
+
+class calcDiffSample : public ParallelLoopBody
+{
+public:
+    calcDiffSample (vector<trainSample>& samples, vector<Point2f>& sumOutput)
+        : _samples(samples), _sumOutput(sumOutput)
+    {
+    }
+
+    virtual void operator ()(const Range& range) const
+    {
+        for (unsigned long r = range.start; r < range.end; r++)
+        {
+            for (unsigned long i = 0; i < _samples[r].targetShape.size(); ++i)
+            {
+                _samples[r].residualShape[i] = _samples[r].targetShape[i] - _samples[r].currentShape[i];
+                _sumOutput[i] = _samples[r].residualShape[i] + _sumOutput[i];
+            }
+        }
+    }
+
+private:
+    vector<trainSample>& _samples;
+    vector<Point2f>& _sumOutput;
+};
+
+class calcConstraintSum : public ParallelLoopBody, protected KazemiFaceAlignImpl
+{
+public:
+    calcConstraintSum(vector<trainSample> &samples, vector< vector<Point2f> >& leftSums, vector<splitFeature>& features, vector<unsigned long>& leftCount)
+        : _samples(samples), _leftSums(leftSums), _features(features), _leftCount(leftCount)
+    {
+    }
+
+    virtual void operator ()(const Range& range) const
+    {
+        for (unsigned long r = range.start; r < range.end ; r++)
+        {
+            for (unsigned long j = 0; j < numTestSplits; ++j)
+            {
+                if((float)_samples[r].pixelValues[_features[j].idx1] - (float)_samples[r].pixelValues[_features[j].idx2] >
+                    _features[j].thresh)
+                {
+                    for(unsigned long m = 0; m < _samples[r].residualShape.size(); m++)
+                    {
+                        _leftSums[j][m] += _samples[r].residualShape[m];
+                    }
+                    _leftCount[j] += 1;
+                }
+            }
+        }
+    }
+private:
+    vector<trainSample>& _samples;
+    vector< vector<Point2f> >& _leftSums;
+    vector<splitFeature>& _features;
+    vector<unsigned long>& _leftCount;
+};
+
 double KazemiFaceAlignImpl::getDistance(Point2f first , Point2f second)
 {
     return sqrt(pow((first.x - second.x),2) + pow((first.y - second.y),2));
@@ -59,19 +142,17 @@ splitFeature KazemiFaceAlignImpl::randomSplitFeatureGenerator(vector<Point2f>& p
 {
     splitFeature feature;
     double acceptProbability, randomdoublenumber;
-    unsigned long attempts = 20;
+    RNG rnd(getTickCount());
     do
     {
-        RNG rnd(getTickCount());
         feature.idx1 = rnd.uniform(0,numFeature);
         feature.idx2 = rnd.uniform(0,numFeature);
         double dist = getDistance(pixelCoordinates[feature.idx1] , pixelCoordinates[feature.idx2]);
         acceptProbability = exp(-dist/lambda);
         randomdoublenumber = rnd.uniform(0.,1.);
-        feature.thresh = rnd.uniform(double(-255),double(255)); //Check Validity
-        attempts--;
+        feature.thresh = rnd.uniform(double(-255),double(255));
     }
-    while((feature.idx1 == feature.idx2 || randomdoublenumber > acceptProbability) && (attempts > 0));
+    while((feature.idx1 == feature.idx2 || randomdoublenumber > acceptProbability));
     return feature;
 }
 
@@ -88,57 +169,58 @@ splitFeature KazemiFaceAlignImpl::splitGenerator(vector<trainSample>& samples, v
     }
     vector<unsigned long> leftCount;
     leftCount.resize(numTestSplits);
-    ///////--------------------SCOPE OF THREADING----------------------/////////////
-    for (unsigned long i = start; i < end ; ++i)
-    {
-        for (unsigned long j = 0; j < numTestSplits; ++j)
-        {
-            if((float)samples[i].pixelValues[features[j].idx1] - (float)samples[i].pixelValues[features[j].idx2] > features[j].thresh)
-            {
-                calcSum(leftSums[j], samples[i].residualShape, leftSums[j]);
-                leftCount[j] += 1;
-            }
-        }
-    }
-    ///////--------------------SCOPE OF THREADING----------------------/////////////
+    parallel_for_(Range(start, end), calcConstraintSum(samples, leftSums, features, leftCount));
     //Select the best feature
     double bestScore = -1;
+    double score = -1;
     unsigned long bestFeature = 0;
-    vector<Point2f> tempFeature;
-    tempFeature.resize(sum.size());
+    vector<Point2f> rightSums,leftSumTree;
+    rightSums.resize(sum.size());
+    leftSumTree.resize(sum.size());
     for (unsigned long i = 0; i < numTestSplits; ++i)
     {
         double currentScore = 0;
-        unsigned long rightCount = end - start + 1 - leftCount[i];  // See for the extra 1
-        if(leftCount[i] != 0 && rightCount != 0)
+        unsigned long rightCount = (end - start + 1) - leftCount[i];  // See for the extra 1
+        for (int j = 0; j < leftSums[i].size(); ++j)
         {
-            calcDiff(sum, leftSums[i], tempFeature);
-            //To calculate score
-            Point2f leftSumsDot(0,0), tempFeatureDot(0,0);
-            for (unsigned long dotit = 0; dotit < leftSums.size(); ++dotit)
+            if(rightCount != 0)
             {
-                leftSumsDot.x += (double)pow((leftSums[i][dotit].x),2);
-                leftSumsDot.y += (double)pow((leftSums[i][dotit].y),2);
-                tempFeatureDot.x += (double)pow((tempFeature[dotit].x),2);
-                tempFeatureDot.y += (double)pow((tempFeature[dotit].y),2);
+                rightSum[j].x = (sum[j].x - leftSums[i][j].x)/ rightCount ;
+                rightSum[j].y = (sum[j].y - leftSums[i][j].y)/ rightCount ;
             }
-            double leftSumsDotRes = sqrt(pow(leftSumsDot.x, 2) + pow(leftSumsDot.y, 2));
-            double tempFeatureDotRes = sqrt(pow(tempFeatureDot.x, 2) + pow(tempFeatureDot.y, 2));
-            currentScore = leftSumsDotRes/leftCount[i] + tempFeatureDotRes/rightCount;
-            if(currentScore > bestScore)
+            else
+                rightSum[j] = Point2f(0,0);
+            if(leftCount[i] != 0)
             {
-                bestScore = currentScore;
+                leftSumTree[j].x = leftSums[i][j].x / leftCount[i];
+                leftSumTree[j].y = leftSums[i][j].y / leftCount[i];
+            }
+            else
+                leftSumTree[j] = Point2f(0,0);
+        }
+            Point2f point1(0,0);
+            Point2f point2(0,0);
+            for(unsigned long k=0;k<leftSumTree.size();k++)
+            {
+                point1.x += (float)(leftSumTree[k].x * leftSumTree[k].x);
+                point2.x += (float)(rightSum[k].x * rightSums[k].x);
+                point1.y += (float)(leftSumTree[k].y * leftSumTree[k].y);
+                point2.y += (float)(rightSum[k].y * rightSums[k].y);
+            }
+            score = (double)sqrt(point1.x + point1.y) * (double)leftCount[i] + (double)sqrt(point2.x + point2.y) * (double)rightCount;
+            if(score > bestScore)
+            {
+                bestScore = score;
                 bestFeature = i;
             }
-        }
     }
+    leftSum.resize(sum.size());
     leftSum = leftSums[bestFeature];
-    if(leftSum.size() != 0)
-        calcDiff(sum, leftSum, rightSum);
-    else
+    rightSum.resize(sum.size());
+    for(unsigned long k = 0; k < sum.size(); k++)
     {
-        rightSum = sum;
-        leftSum.assign(sum.size(), Point2f(0,0));
+        rightSum[k].x = sum[k].x - leftSum[k].x;
+        rightSum[k].y = sum[k].y - leftSum[k].y;
     }
 return features[bestFeature];
 }
@@ -153,13 +235,8 @@ regressionTree KazemiFaceAlignImpl::buildRegressionTree(vector<trainSample>& sam
     vector<Point2f> zerovector;
     zerovector.assign(samples[0].targetShape.size(), Point2f(0,0));
     vector< vector<Point2f> > sums(numSplitNodes*2 + 1 , zerovector);
-    ////---------------------------------SCOPE OF THREADING---------------------------------------////
     //Initialize Sum for the root node
-    for (unsigned long i = 0; i < samples.size(); i++)
-    {
-        calcDiff(samples[i].targetShape, samples[i].currentShape, samples[i].residualShape);
-        calcSum(samples[i].residualShape, sums[0], sums[0]);
-    }
+    parallel_for_(Range(0, samples.size()), calcDiffSample(samples, sums[0]));
     //Iteratively generate Splits in the samples
     for (unsigned long int i = 0; i < numSplitNodes; i++)
     {
@@ -180,49 +257,20 @@ regressionTree KazemiFaceAlignImpl::buildRegressionTree(vector<trainSample>& sam
     for (unsigned long int i = 0; i < partition.size(); ++i)
     {
         unsigned long currentCount = partition[i].second - partition[i].first + 1;
-        /*for (unsigned long j = partition[i].first; j < partition[i].second; ++j)
-            calcSum(residualSum, onesvector, residualSum);
-        //Calculate Reciprocal
-        for (unsigned long k = 0; k < residualSum.size(); ++k)
-        {
-            if(residualSum[k].x != 0)
-                residualSum[k].x  = 1 / residualSum[k].x;
-            else
-                residualSum[k].x = 0;
-            if(residualSum[k].y != 0)
-                residualSum[k].y = 1 / residualSum[k].y;
-            else
-                residualSum[k].y = 0;
-        }*/
-        //End Reciprocal
         if(partition[i].first != partition[i].second)
             {
                 tree.leaves[i] = sums[numSplitNodes+i];
                 for (unsigned long l = 0; l < tree.leaves[i].size(); ++l)
                 {
-                    //cout<<"Initial tree value"<<tree.leaves[i][l]<<endl;
                     tree.leaves[i][l].x = ( learningRate * tree.leaves[i][l].x ) / currentCount;
                     tree.leaves[i][l].y = (learningRate * tree.leaves[i][l].y ) / currentCount;
-                    //cout<<tree.leaves[i][l]<<endl;
                 }
-
-                //calcMul(residualSum,tree.leaves[i], tree.leaves[i]); // To be fully implemented in case of missing labels
             }
         else
             tree.leaves[i].assign(samples[0].targetShape.size(), Point2f(0,0));
         vector<Point2f> tempvector;
         tempvector.resize(samples[0].targetShape.size());
-        for (unsigned long j = partition[i].first; j < partition[i].second; ++j)
-        {
-            calcSum(samples[j].currentShape, tree.leaves[i], samples[j].currentShape);
-            //calcDiff(samples[j].targetShape, tempvector, samples[j].currentShape);
-            //To be fully implemented in case of missing labels
-            /* for (unsigned long m = 0; m < samples[j].currentShape.size(); ++m)
-            {
-                if(samples[j].residualShape[m].x == 0 &&  samples[j].residualShape[m].y == 0)
-                    samples[j].targetShape[m] = samples[j].currentShape[m];
-            } */
-        }
+        parallel_for_(Range(partition[i].first,partition[i].second), calcSumSample(samples, tree.leaves[i]));
     }
     return tree;
 }
@@ -235,10 +283,6 @@ vector<regressionTree> KazemiFaceAlignImpl::gradientBoosting(vector<trainSample>
     {
         regressionTree tree = buildRegressionTree(samples,pixelCoordinates);
         forest.push_back(tree);
-    }
-    for (unsigned long i = 0; i < samples.size(); i++)
-    {
-        calcDiff(samples[i].targetShape, samples[i].residualShape, samples[i].currentShape);
     }
     return forest;
 }

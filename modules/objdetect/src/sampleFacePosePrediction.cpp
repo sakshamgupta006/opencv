@@ -43,6 +43,7 @@
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
 #include "train_shape.hpp"
+#include "opencv2/videoio.hpp"
 #include <bits/stdc++.h>
 
 using namespace std;
@@ -60,10 +61,10 @@ int main(int argc, const char** argv)
     string poseTree;
     cv::CommandLineParser parser(argc ,argv,
             "{help h||}"
-            "{cascade | ../../../../data/haarcascades/haarcascade_frontalface_alt.xml|}"  //Add LBP , HOG and HAAR based detectors also
-            "{path | ../data/train/ | }"
+            "{cascade | /home/cooper/gsoc/opencv/data/haarcascades/haarcascade_frontalface_alt.xml|}"  //Add LBP , HOG and HAAR based detectors also
+            "{path | ../data/300wcropped/ | }"
             "{poseTree| 194_landmarks_face_align.dat |}"
-            "{@filename| ../data/train/213033657_1.jpg |}"
+            "{@filename| ../data/300wcropped/outdoor_292.png |}"
         );
     if(parser.has("help"))
     {
@@ -99,7 +100,12 @@ int main(int argc, const char** argv)
     predict.calcMeanShapeBounds();
     cout<<"Model Loaded"<<endl;
     vector< vector<Point2f> > resultLandmarks;
-    resultLandmarks = predict.getFacialLandmarks(image, forests, pixelCoordinates, cascade);
-
+    //VideoCapture cap(0);
+    // while(1)
+    // {
+       // cap >> image;
+        predict.getFacialLandmarks(image, forests, pixelCoordinates, cascade);
+      //  waitKey(0) ;//>= 0) break;
+    //}
     return 0;
 }
